@@ -1,5 +1,5 @@
 
-==AWSHeet==
+## AWSHeet
 
 * automatically provision and configure AWS resources
 * create equivalent stacks in production, staging and testing environments
