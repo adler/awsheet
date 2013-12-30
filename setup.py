@@ -17,7 +17,7 @@ setup(
     license = "Apache 2.0",
     #keywords = ""
     url = "http://github.com/adler/awsheet",
-    packages=[''],
+    packages=['awsheet'],
     long_description=read('README.md'),
     classifiers=[
         "Development Status :: 3 - Alpha",

@@ -1,0 +1,4 @@
+recursive-include awsheet *
+include requirements.txt
+include README.md
+include LICENSE

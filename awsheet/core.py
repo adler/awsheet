@@ -181,7 +181,6 @@ class CloudFormationHelper(AWSHelper):
         self.wait_for_complete()
 
     def destroy(self):
-        exit(0)
         status = self.status()
         if status == CloudFormationHelper.DOES_NOT_EXIST:
             return
