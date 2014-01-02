@@ -1,10 +1,10 @@
 
 ## AWSHeet
 
-* automatically provision and configure AWS resources
+* automatically provision and configure AWS resources (uses boto and awscli internally)
 * create equivalent stacks in production, staging and testing environments
 * build your own scripts based on AWSHeet's idempotent primitives
-* designed to be extensible
+* extend AWSHeet with your own custom business logic
 * delete/terminate all resources on demand
 
 ### How we use it

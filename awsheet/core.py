@@ -9,6 +9,7 @@ import tempfile
 import argparse
 import sys
 import logging
+import atexit
 import boto
 import boto.ec2
 import boto.ec2.elb
@@ -32,6 +33,7 @@ class AWSHeet:
         self.base_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
         self.base_name = re.search('(.*)\.[^\.]*$', os.path.basename(sys.argv[0])).group(1)
         self.load_creds()
+        atexit.register(self._finalize)
 
     def load_creds(self):
         """Load credentials in preferred order 1) from x.auth file 2) from environmental vars or 3) from ~/.boto config"""
@@ -65,7 +67,8 @@ class AWSHeet:
             resource.converge()
         return resource
 
-    def finalize(self):
+    def _finalize(self):
+        """Run this function automatically atexit. If --destroy flag is use, destroy all resouces in reverse order"""
         if not self.args.destroy:
             return
         sys.stdout.write("You have asked to destroy the following resources from the '%s' environment:\n%s\n" % (self.args.environment, self.resources))
@@ -73,7 +76,7 @@ class AWSHeet:
         choice = raw_input().lower()
         if choice != 'y':
             print "Abort - not destroying resources without affirmation"
-            exit(0)
+            exit(1)
         for resource in reversed(self.resources):
             print "destroying %s resource" % resource
             resource.destroy()
@@ -525,5 +528,3 @@ class GSLBHelper(AWSHelper):
             output = subprocess.check_output(cmd)
         except Exception:
             self.heet.logger.debug("healthcheck %s may not have existed" % healthcheck_id)
-
-
