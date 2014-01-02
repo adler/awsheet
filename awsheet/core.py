@@ -29,6 +29,35 @@ class AWSHeet:
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
+        self.base_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
+        self.base_name = re.search('(.*)\.[^\.]*$', os.path.basename(sys.argv[0])).group(1)
+        self.load_creds()
+
+    def load_creds(self):
+        """Load credentials in preferred order 1) from x.auth file 2) from environmental vars or 3) from ~/.boto config"""
+
+        user_boto_config = os.path.join(os.environ.get('HOME'), ".boto")
+        self.parse_creds_from_file(user_boto_config)
+
+        self.access_key_id = os.getenv('AWS_ACCESS_KEY_ID', None)
+        self.secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY', None)
+
+        auth_file = os.path.join(self.base_dir, self.base_name + ".auth")
+        self.parse_creds_from_file(auth_file)
+
+        self.logger.debug("using account AWS_ACCESS_KEY_ID=%s" % self.access_key_id)
+
+    def parse_creds_from_file(self, filename):
+        if not os.path.exists(filename):
+            return
+        with open(filename) as f:
+            for line in f:
+                match = re.match('^[^#]*AWS_ACCESS_KEY_ID\s*=\s*(\S+)', line, re.IGNORECASE)
+                if match:
+                    self.access_key_id = match.group(1)
+                match = re.match('^[^#]*AWS_SECRET_ACCESS_KEY\s*=\s*(\S+)', line, re.IGNORECASE)
+                if match:
+                    self.secret_access_key = match.group(1)
 
     def add_resource(self, resource):
         self.resources.append(resource)
@@ -78,7 +107,10 @@ class AWSHeet:
     def add_instance_to_elb(self, defaults, elb_name, instance_helper):
         if self.args.destroy:
             return
-        conn = boto.ec2.elb.connect_to_region(defaults['region'])
+        conn = boto.ec2.elb.connect_to_region(
+            defaults['region'],
+            aws_access_key_id=self.access_key_id,
+            aws_secret_access_key=self.secret_access_key)
         lb = conn.get_all_load_balancers(load_balancer_names=[elb_name])[0]
         instance_id = instance_helper.get_instance().id
         self.logger.info("register instance %s on %s" % (instance_id, elb_name))
@@ -111,7 +143,10 @@ class CloudFormationHelper(AWSHelper):
         self.template_file_name = heet.get_value('template_file_name', kwargs)
         self.template = open(self.template_file_name, 'r').read();
         self.version = heet.get_value('version', kwargs, default=heet.get_version())
-        self.conn = boto.cloudformation.connect_to_region(self.heet.get_value('region'))
+        self.conn = boto.cloudformation.connect_to_region(
+            self.heet.get_value('region'),
+            aws_access_key_id=heet.access_key_id,
+            aws_secret_access_key=heet.secret_access_key)
         heet.add_resource(self)
 
     def stack_name(self):
@@ -207,7 +242,10 @@ class InstanceHelper(AWSHelper):
         self.security_groups.extend(self.base_security_groups if self.base_security_groups else [])
         user_data = heet.get_value('user_data', kwargs, required=False)
         self.user_data = json.dumps(user_data) if type(user_data) == dict else user_data
-        self.conn = boto.ec2.connect_to_region(heet.get_value('region'))
+        self.conn = boto.ec2.connect_to_region(
+            heet.get_value('region'),
+            aws_access_key_id=heet.access_key_id,
+            aws_secret_access_key=heet.secret_access_key)
         # need unique way of identifying the instance based upon the inputs of this class (i.e. not the EC2 instance-id)
         self.unique_tag = '%s__%s__v%s__i%s' % (self.role, self.environment, self.version, self.index)
         heet.add_resource(self)
@@ -343,7 +381,9 @@ class CNAMEHelper(AWSHelper):
         self.zone_id = self.heet.get_value('zone_id')
         self.domain = self.heet.get_value('domain')
         self.ttl = self.heet.get_value('ttl', kwargs, default=300)
-        self.conn = boto.connect_route53()
+        self.conn = boto.connect_route53(
+            aws_access_key_id=heet.access_key_id,
+            aws_secret_access_key=heet.secret_access_key)
         # get_zone does not like leading periods
         self.zone = self.conn.get_zone(self.domain.lstrip('.'))
         heet.add_resource(self)
