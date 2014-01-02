@@ -197,14 +197,14 @@ class InstanceHelper(AWSHelper):
         self.environment = heet.get_value('environment', kwargs, default=heet.get_environment())
         self.ami = heet.get_value('ami', kwargs)
         self.key_name = heet.get_value('key_name', kwargs)
-        self.instance_type = heet.get_value('instance_type', kwargs, default='c1.medium')
+        self.instance_type = heet.get_value('instance_type', kwargs, default='t1.micro')
         self.version = heet.get_value('version', kwargs, default=heet.get_version())
-        self.subnet_id = heet.get_value('subnet_id', kwargs)
-        self.index = heet.get_value('index', kwargs)
+        self.subnet_id = heet.get_value('subnet_id', kwargs, required=False)
+        self.index = heet.get_value('index', kwargs, required=False)
         # combine base_security_groups from heet defaults and security_groups from kwargs
-        self.base_security_groups = heet.get_value('base_security_groups', default=[])
+        self.base_security_groups = heet.get_value('base_security_groups', required=False)
         self.security_groups = heet.get_value('security_groups', kwargs, default=[])
-        self.security_groups.extend(self.base_security_groups)
+        self.security_groups.extend(self.base_security_groups if self.base_security_groups else [])
         user_data = heet.get_value('user_data', kwargs, required=False)
         self.user_data = json.dumps(user_data) if type(user_data) == dict else user_data
         self.conn = boto.ec2.connect_to_region(heet.get_value('region'))
@@ -228,24 +228,33 @@ class InstanceHelper(AWSHelper):
 
     def provision_resource(self):
         """ask EC2 for a new instance and return boto ec2 instance object"""
-        # only vpc-style instances supported
-        interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(
-            subnet_id=self.subnet_id,
-            groups=self.security_groups,
-            associate_public_ip_address=True
-            )
-        interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
-        reservation = self.conn.run_instances(
-            self.ami,
-            # only supporting 1 instance per reservation / helper
-            min_count=1,
-            max_count=1,
-            key_name=self.key_name,
-            user_data=self.user_data,
-            instance_type=self.instance_type,
-            network_interfaces=interfaces,
-            dry_run=False
-            )
+        # only tested with vpc-style accounts
+        # only supporting 1 instance per reservation / helper
+
+        kwargs = {
+            'min_count' : 1,
+            'max_count' : 1,
+            'key_name' : self.key_name,
+            'user_data' : self.user_data,
+            'instance_type' : self.instance_type
+            }
+
+        if self.subnet_id:
+            # AWS expect security group *ids* when calling via this technique
+            # create network interface with security_groups and public ip address
+            interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(
+                subnet_id=self.subnet_id,
+                groups=self.security_groups,
+                associate_public_ip_address=True
+                )
+            interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
+            kwargs['network_interfaces'] = interfaces
+        else:
+            # AWS expect security groups *names* when calling via this technique
+            kwargs['security_groups'] = self.security_groups
+
+        #kwargs['dry_run'] = True
+        reservation = self.conn.run_instances(self.ami, **kwargs)
         return reservation.instances[0]
 
     def wait_unil_ready(self):
@@ -265,11 +274,13 @@ class InstanceHelper(AWSHelper):
             self.wait_unil_ready()
         self.set_tag(AWSHeet.TAG, self.unique_tag)
         self.set_tag('Name', self.get_name())
-        CNAMEHelper(self.heet, self.get_dnsname(), self)
-        if (self.index):
+        if self.get_dnsname():
+            CNAMEHelper(self.heet, self.get_dnsname(), self)
+        if self.get_index_dnsname():
             CNAMEHelper(self.heet, self.get_index_dnsname(), self)
         self.post_converge_hook()
-        self.heet.logger.info("the following instance is ready '%s'" % self.get_dnsname())
+        name = self.get_dnsname() if self.get_dnsname() else self.get_instance().public_dns_name
+        self.heet.logger.info("the following instance is ready '%s'" % name)
         return self
 
     def destroy(self):
@@ -278,8 +289,10 @@ class InstanceHelper(AWSHelper):
         if not instance:
             return
         self.pre_destroy_hook()
-        CNAMEHelper(self.heet, self.get_dnsname(), self).destroy()
-        CNAMEHelper(self.heet, self.get_index_dnsname(), self).destroy()
+        if self.get_dnsname():
+            CNAMEHelper(self.heet, self.get_dnsname(), self).destroy()
+        if self.get_index_dnsname():
+            CNAMEHelper(self.heet, self.get_index_dnsname(), self).destroy()
         self.heet.logger.info("terminating %s" % instance)
         self.conn.terminate_instances([instance.id])
 
@@ -295,18 +308,24 @@ class InstanceHelper(AWSHelper):
     def get_name(self):
         """returns a unique host name, usually a combination of role and environment and something unique about the instance. When converging, an Name tag is created with this value"""
         if self.get_instance():
-            octets = self.get_instance().idprivate_ip_address.split('.')
+            octets = self.get_instance().private_ip_address.split('.')
         else:
             octets = '0.0.0.0'.split('.')
         return '%s-%s-%s-%s-%s' % (self.get_basename(), octets[0], octets[1], octets[2], octets[3])
 
     def get_dnsname(self):
-        """returns a unique dns name based on get_name()/get_basename() including domain"""
-        return self.get_name() + self.heet.get_value('domain')
+        """returns a unique dns name based on get_name()/get_basename() including domain. Return None when no domain provided or other exception"""
+        try:
+            return self.get_name() + self.heet.get_value('domain')
+        except:
+            return None
 
     def get_index_dnsname(self):
-        """returns a unique dns name based on instance get_basename() and index including domain"""
-        return "%s-%02d%s" % (self.get_basename(), self.index, self.heet.get_value('domain'))
+        """returns a unique dns name based on instance get_basename() and index including domain. Return None when no domain provided or other exception"""
+        try:
+            return "%s-%02d%s" % (self.get_basename(), self.index, self.heet.get_value('domain'))
+        except:
+            return None
 
     def set_tag(self, key, value):
         """add tag to the instance. This operation is idempotent. Tags are automatically destroyed when instances are terminated"""
