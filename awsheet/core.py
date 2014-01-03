@@ -96,13 +96,13 @@ class AWSHeet:
         return self.args.environment
 
     def get_value(self, name, kwargs={}, default=None, required=True):
-        """return first existing value from 1) kwargs dict params 2) default param 3) global heet defaults or 4) return None"""
+        """return first existing value from 1) kwargs dict params 2) global heet defaults 3) default param or 4) return None"""
         if (name in kwargs):
             return kwargs[name]
-        if (default != None):
-            return default
         if (name in self.defaults):
             return self.defaults[name]
+        if (default != None):
+            return default
         if required:
             raise Exception("You are missing a required argument or default value for '%s'." % (name))
         return None
@@ -247,9 +247,9 @@ class InstanceHelper(AWSHelper):
         self.subnet_id = heet.get_value('subnet_id', kwargs, required=False)
         self.index = heet.get_value('index', kwargs, required=False)
         # combine base_security_groups from heet defaults and security_groups from kwargs
-        self.base_security_groups = heet.get_value('base_security_groups', required=False)
+        self.base_security_groups = heet.get_value('base_security_groups', default=[])
         self.security_groups = heet.get_value('security_groups', kwargs, default=[])
-        self.security_groups.extend(self.base_security_groups if self.base_security_groups else [])
+        self.security_groups.extend(self.base_security_groups)
         user_data = heet.get_value('user_data', kwargs, required=False)
         self.user_data = json.dumps(user_data) if type(user_data) == dict else user_data
         self.conn = boto.ec2.connect_to_region(
