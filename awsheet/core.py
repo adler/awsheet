@@ -258,8 +258,9 @@ class InstanceHelper(AWSHelper):
             aws_secret_access_key=heet.secret_access_key)
         # need unique way of identifying the instance based upon the inputs of this class (i.e. not the EC2 instance-id)
         self.unique_tag = '%s__%s__v%s__i%s' % (self.role, self.environment, self.version, self.index)
-        heet.add_resource(self)
+        # call post_init_hook before add_resource/converge
         self.post_init_hook()
+        heet.add_resource(self)
 
     def get_resource_object(self):
         """return boto object for existing resource or None of doesn't exist. the response is not cached"""
