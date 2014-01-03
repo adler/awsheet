@@ -107,6 +107,13 @@ class AWSHeet:
             raise Exception("You are missing a required argument or default value for '%s'." % (name))
         return None
 
+    def exec_awscli(self, cmd):
+        env = os.environ.copy()
+        env['AWS_ACCESS_KEY_ID'] = self.access_key_id
+        env['AWS_SECRET_ACCESS_KEY'] = self.secret_access_key
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, env=env)
+        return proc.communicate()[0]
+
     def add_instance_to_elb(self, defaults, elb_name, instance_helper):
         if self.args.destroy:
             return
@@ -467,7 +474,7 @@ class GSLBHelper(AWSHelper):
     def get_records_with_name(self, name):
         records = []
         cmd = ['aws', 'route53', 'list-resource-record-sets', '--hosted-zone-id', self.zone_id, '--start-record-name', name]
-        output = subprocess.check_output(cmd)
+        output = self.heet.exec_awscli(cmd)
         var = json.loads(output)
         for record in var['ResourceRecordSets']:
             if record['Name'] == name:
@@ -510,14 +517,14 @@ class GSLBHelper(AWSHelper):
 
         # putting json on command line did not work: '--change-batch', "'" + json.dumps(change_request) + "'"
         cmd = ['aws', 'route53', 'change-resource-record-sets', '--hosted-zone-id', self.zone_id, '--change-batch', 'file://' + temp_path]
-        output = subprocess.check_output(cmd)
+        output = self.heet.exec_awscli(cmd)
         os.remove(temp_path)
 
     def create_health_check(self):
         """creates Route53 health check and returns healthcheck id"""
         # TODO consider passing FullyQualifiedDomainName if http health check needs Host header
         cmd = ['aws', 'route53', 'create-health-check', '--caller-reference', self.target, '--health-check-config', 'IPAddress=%s,Port=%s,Type=%s,ResourcePath=%s' % (self.target, self.healthcheck_port, 'HTTP', self.healthcheck_path)]
-        output = subprocess.check_output(cmd)
+        output = self.heet.exec_awscli(cmd)
         var = json.loads(output)
         return var['HealthCheck']['Id']
 
