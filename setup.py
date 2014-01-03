@@ -22,4 +22,6 @@ setup(
     classifiers=[
         "Development Status :: 3 - Alpha",
     ],
+    # install_requires is good for install via pip
+    install_requires = ['boto', 'awscli'],
 )
