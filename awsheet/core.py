@@ -71,15 +71,15 @@ class AWSHeet:
         """Run this function automatically atexit. If --destroy flag is use, destroy all resouces in reverse order"""
         if not self.args.destroy:
             return
-        sys.stdout.write("You have asked to destroy the following resources from the '%s' environment:\n%s\n" % (self.args.environment, self.resources))
+        sys.stdout.write("You have asked to destroy the following resources from [ %s / %s ]:\n%s\n" % (self.base_name, self.get_environment(), self.resources))
         sys.stdout.write("Are you sure? y/N: ")
         choice = raw_input().lower()
         if choice != 'y':
-            print "Abort - not destroying resources without affirmation"
+            self.logger.warn("Abort - not destroying resources from [ %s / %s ] without affirmation" % (self.base_name, self.get_environment()))
             exit(1)
         for resource in reversed(self.resources):
-            print "destroying %s resource" % resource
             resource.destroy()
+        self.logger.info("all AWS resources in [ %s / %s ] are destroyed" % (self.base_name, self.get_environment()))
 
     def parse_args(self):
         parser = argparse.ArgumentParser(description='create and destroy AWS resources idempotently')
@@ -265,7 +265,7 @@ class InstanceHelper(AWSHelper):
     def get_resource_object(self):
         """return boto object for existing resource or None of doesn't exist. the response is not cached"""
         for instance in self.conn.get_only_instances(filters={'tag:'+AWSHeet.TAG:self.unique_tag}):
-            if instance.state != 'terminated':
+            if instance.state == 'pending' or instance.state == 'running':
                 return instance
         return None
 
@@ -277,6 +277,8 @@ class InstanceHelper(AWSHelper):
 
     def provision_resource(self):
         """ask EC2 for a new instance and return boto ec2 instance object"""
+
+        self.heet.logger.info("provisioning ec2 instance type %s for role=%s and environment=%s" % (self.instance_type, self.role, self.environment))
         # only tested with vpc-style accounts
         # only supporting 1 instance per reservation / helper
 
