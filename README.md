@@ -1,8 +1,9 @@
-
 ## AWSHeet
 
+AWSHeet is a python library that provision AWS resources. It allows you to build your infrastructure as code and facilitate continuous delivery.
+
 * automatically provision and configure AWS resources (uses boto and awscli internally)
-* create equivalent stacks in production, staging and testing environments
+* create *equivalent* stacks in production, staging and testing environments
 * build your own scripts based on AWSHeet's idempotent primitives
 * extend AWSHeet with your own custom business logic
 * delete/terminate all resources on demand
@@ -14,3 +15,6 @@
 * store role definition and environment in user_data so puppet can find it
 * provision 8 xlarge instances in prod but only 1 medium in staging
 * create an "indexed" CNAME with a predictable value (e.g. "production-www-01.sub.domain.tld")
+
+### Demo
+Check out the demos to better understand how it works https://github.com/adler/awsheet-demos
