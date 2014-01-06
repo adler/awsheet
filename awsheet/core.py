@@ -71,8 +71,10 @@ class AWSHeet:
         """Run this function automatically atexit. If --destroy flag is use, destroy all resouces in reverse order"""
         if not self.args.destroy:
             return
-        sys.stdout.write("You have asked to destroy the following resources from [ %s / %s ]:\n%s\n" % (self.base_name, self.get_environment(), self.resources))
-        sys.stdout.write("Are you sure? y/N: ")
+        sys.stdout.write("You have asked to destroy the following resources from [ %s / %s ]:\n\n" % (self.base_name, self.get_environment()))
+        for resource in self.resources:
+            print " * %s" % type(resource)
+        sys.stdout.write("\nAre you sure? y/N: ")
         choice = raw_input().lower()
         if choice != 'y':
             self.logger.warn("Abort - not destroying resources from [ %s / %s ] without affirmation" % (self.base_name, self.get_environment()))
@@ -130,13 +132,13 @@ class AWSHelper(object):
     "modular and convergent AWS Resources superclass"
 
     def post_init_hook(self):
-        self.heet.logger.debug("no defined method post_init_hook for %s" % self)
+        self.heet.logger.debug("no defined method post_init_hook for %s" % type(self))
 
     def post_converge_hook(self):
-        self.heet.logger.debug("no defined method post_converge_hook for %s" % self)
+        self.heet.logger.debug("no defined method post_converge_hook for %s" % type(self))
 
     def pre_destroy_hook(self):
-        self.heet.logger.debug("no defined method pre_destroy_hook for %s" % self)
+        self.heet.logger.debug("no defined method pre_destroy_hook for %s" % type(self))
 
     def get_cname_target(self):
         raise Exception("no cname target defined for %s" % self)
@@ -153,6 +155,9 @@ class CloudFormationHelper(AWSHelper):
         self.template_file_name = heet.get_value('template_file_name', kwargs)
         self.template = open(self.template_file_name, 'r').read();
         self.version = heet.get_value('version', kwargs, default=heet.get_version())
+        self.parameters = heet.get_value('parameters', kwargs, default=())
+        if type(self.parameters) is dict:
+            self.parameters = tuple(self.parameters.items())
         self.conn = boto.cloudformation.connect_to_region(
             self.heet.get_value('region'),
             aws_access_key_id=heet.access_key_id,
@@ -178,7 +183,7 @@ class CloudFormationHelper(AWSHelper):
         else:
             return stack.stack_status
 
-    def get_output(self, key, default=''):
+    def get_output(self, key, default=None):
         stack = self.describe()
         if stack == None:
             return default
@@ -187,15 +192,26 @@ class CloudFormationHelper(AWSHelper):
                 return output.value
         return default
 
+    def get_resource(self, logical_id):
+        try:
+            resources = self.conn.list_stack_resources(self.stack_name())
+        except:
+            return None
+        for r in resources:
+            if r.logical_resource_id == logical_id:
+                return r.physical_resource_id
+        return None
+
     def create(self):
         self.heet.logger.info("creating CloudFormation stack '%s'" % self.stack_name())
-        self.conn.create_stack(self.stack_name(), self.template, None)
+        self.conn.create_stack(self.stack_name(), template_body=self.template, parameters=self.parameters)
 
     def update(self):
         try:
             self.heet.logger.info("updating CloudFormation stack '%s'" % self.stack_name())
-            self.conn.update_stack(self.stack_name(), self.template)
+            self.conn.update_stack(self.stack_name(), template_body=self.template, parameters=self.parameters)
         except boto.exception.BotoServerError as e:
+            #self.heet.logger.debug("unable to update - maybe no change of '%s'" % self.stack_name())
             # noop update results in 400
             return
 
@@ -214,12 +230,14 @@ class CloudFormationHelper(AWSHelper):
     def wait_for_complete(self):
         while(True):
             status = self.status()
-            self.heet.logger.debug("CloudFormation stack '%s' status: %s" % (self.stack_name(), status))
-            if re.search('COMPLETE', status):
+            if status == 'ROLLBACK_COMPLETE':
+                raise Exception("CloudFormation stack '%s' status: %s" % (self.stack_name(), status))
+            if re.search('COMPLETE|FAILED', status):
                 break
             if status == CloudFormationHelper.DOES_NOT_EXIST:
                 break
-            time.sleep(2)
+            self.heet.logger.debug("CloudFormation stack '%s' status: %s" % (self.stack_name(), status))
+            time.sleep(5)
 
     def converge(self):
         self.create_or_update()
@@ -330,7 +348,11 @@ class InstanceHelper(AWSHelper):
         if self.get_index_dnsname():
             CNAMEHelper(self.heet, self.get_index_dnsname(), self)
         self.post_converge_hook()
-        name = self.get_dnsname() if self.get_dnsname() else self.get_instance().public_dns_name
+        name = self.get_dnsname()
+        if not name:
+            name = self.get_instance().public_dns_name
+        if not name:
+            name = self.get_instance().ip_address
         self.heet.logger.info("the following instance is ready '%s'" % name)
         return self
 
