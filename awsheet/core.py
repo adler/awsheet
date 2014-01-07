@@ -73,7 +73,7 @@ class AWSHeet:
             return
         sys.stdout.write("You have asked to destroy the following resources from [ %s / %s ]:\n\n" % (self.base_name, self.get_environment()))
         for resource in self.resources:
-            print " * %s" % type(resource)
+            print " * %s" % resource
         sys.stdout.write("\nAre you sure? y/N: ")
         choice = raw_input().lower()
         if choice != 'y':
@@ -131,6 +131,9 @@ class AWSHeet:
 class AWSHelper(object):
     "modular and convergent AWS Resources superclass"
 
+    def __str__(self):
+        return str(type(self))
+
     def post_init_hook(self):
         self.heet.logger.debug("no defined method post_init_hook for %s" % type(self))
 
@@ -142,6 +145,7 @@ class AWSHelper(object):
 
     def get_cname_target(self):
         raise Exception("no cname target defined for %s" % self)
+
 
 class CloudFormationHelper(AWSHelper):
     "modular and convergent AWS CloudFormation"
@@ -163,6 +167,9 @@ class CloudFormationHelper(AWSHelper):
             aws_access_key_id=heet.access_key_id,
             aws_secret_access_key=heet.secret_access_key)
         heet.add_resource(self)
+
+    def __str__(self):
+        return "CloudFormation %s" % self.stack_name()
 
     def stack_name(self):
         if self.version:
@@ -279,6 +286,9 @@ class InstanceHelper(AWSHelper):
         # call post_init_hook before add_resource/converge
         self.post_init_hook()
         heet.add_resource(self)
+
+    def __str__(self):
+        return "Instance %s" % self.unique_tag
 
     def get_resource_object(self):
         """return boto object for existing resource or None of doesn't exist. the response is not cached"""
@@ -423,6 +433,9 @@ class CNAMEHelper(AWSHelper):
         self.zone = self.conn.get_zone(self.domain.lstrip('.'))
         heet.add_resource(self)
 
+    def __str__(self):
+        return "CNAME %s" % self.name
+
     def get_resource_object(self):
         self.record = self.zone.get_cname(self.name)
         return self.record
@@ -446,6 +459,7 @@ class CNAMEHelper(AWSHelper):
         self.heet.logger.info("deleting CNAME record %s" % (self.name))
         self.zone.delete_cname(self.name)
 
+
 class GSLBHelper(AWSHelper):
     """modular and convergent weighted+healthchecked dns records. AFAIK, boto 2.21 does not support creating records with healthchecks, so shell out to aws"""
 
@@ -459,6 +473,9 @@ class GSLBHelper(AWSHelper):
         self.ttl = self.heet.get_value('ttl', kwargs, default=300)
         self.zone_id = self.heet.get_value('zone_id')
         heet.add_resource(self)
+
+    def __str__(self):
+        return "GSLB %s" % self.name
 
     def get_resource_object(self):
         """return record that matches on self.name==Name and self.target==Value or return None"""
