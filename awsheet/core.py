@@ -266,7 +266,7 @@ class InstanceHelper(AWSHelper):
         self.role = role
         self.environment = heet.get_value('environment', kwargs, default=heet.get_environment())
         self.ami = heet.get_value('ami', kwargs)
-        self.key_name = heet.get_value('key_name', kwargs)
+        self.key_name = heet.get_value('key_name', kwargs, required=False)
         self.instance_type = heet.get_value('instance_type', kwargs, default='t1.micro')
         self.version = heet.get_value('version', kwargs, default=heet.get_version())
         self.subnet_id = heet.get_value('subnet_id', kwargs, required=False)
@@ -303,12 +303,23 @@ class InstanceHelper(AWSHelper):
             self.instance = self.get_resource_object()
         return self.instance
 
+    def find_key_name(self):
+        """returns first Key Pair returned by api. This is just a guess that should work for some people if no key pair is specified"""
+        key_pairs = self.conn.get_all_key_pairs()
+        if len(key_pairs) == 0:
+            raise Exception("your AWS account must have at least one Key Pair https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#KeyPairs:")
+        return key_pairs[0].name
+
     def provision_resource(self):
         """ask EC2 for a new instance and return boto ec2 instance object"""
 
         self.heet.logger.info("provisioning ec2 instance type %s for role=%s and environment=%s" % (self.instance_type, self.role, self.environment))
         # only tested with vpc-style accounts
         # only supporting 1 instance per reservation / helper
+
+        if (self.key_name is None):
+            self.key_name = self.find_key_name()
+            self.heet.logger.debug("no key_name was provided, so use the first Key Pair from api: '%s'" % self.key_name)
 
         kwargs = {
             'min_count' : 1,
