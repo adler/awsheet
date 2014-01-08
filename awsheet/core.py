@@ -91,6 +91,9 @@ class AWSHeet:
         #parser.add_argument('-n', '--dry-run', help='environment', action='store_true')
         self.args = parser.parse_args()
 
+    def get_region(self):
+        return self.get_value('region', default='us-east-1')
+
     def get_version(self):
         return self.args.version if self.args.version else 0
 
@@ -123,7 +126,7 @@ class AWSHeet:
         if self.args.destroy:
             return
         conn = boto.ec2.elb.connect_to_region(
-            defaults['region'],
+            self.get_region(),
             aws_access_key_id=self.access_key_id,
             aws_secret_access_key=self.secret_access_key)
         lb = conn.get_all_load_balancers(load_balancer_names=[elb_name])[0]
@@ -166,7 +169,7 @@ class CloudFormationHelper(AWSHelper):
         if type(self.parameters) is dict:
             self.parameters = tuple(self.parameters.items())
         self.conn = boto.cloudformation.connect_to_region(
-            self.heet.get_value('region'),
+            self.heet.get_region(),
             aws_access_key_id=heet.access_key_id,
             aws_secret_access_key=heet.secret_access_key)
         heet.add_resource(self)
@@ -281,7 +284,7 @@ class InstanceHelper(AWSHelper):
         user_data = heet.get_value('user_data', kwargs, required=False)
         self.user_data = json.dumps(user_data) if type(user_data) == dict else user_data
         self.conn = boto.ec2.connect_to_region(
-            heet.get_value('region'),
+            heet.get_region(),
             aws_access_key_id=heet.access_key_id,
             aws_secret_access_key=heet.secret_access_key)
         # need unique way of identifying the instance based upon the inputs of this class (i.e. not the EC2 instance-id)
