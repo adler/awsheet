@@ -286,7 +286,8 @@ class InstanceHelper(AWSHelper):
             aws_access_key_id=heet.access_key_id,
             aws_secret_access_key=heet.secret_access_key)
         # need unique way of identifying the instance based upon the inputs of this class (i.e. not the EC2 instance-id)
-        self.unique_tag = '%s__%s__v%s__i%s' % (self.role, self.environment, self.version, self.index)
+        #self.unique_tag = '%s__%s__v%s__i%s' % (self.role, self.environment, self.version, self.index)
+        self.unique_tag = '%s/%s/v=%s/%s/%s/index=%s/%s' % (self.heet.base_name, self.environment, self.version, self.ami, self.instance_type, self.index, self.role)
         # call post_init_hook before add_resource/converge
         self.post_init_hook()
         heet.add_resource(self)
@@ -596,6 +597,7 @@ class GSLBHelper(AWSHelper):
 
 class SecurityGroupHelper(AWSHelper):
     "modular and convergent security groups"
+    # TODO compare with https://gist.github.com/steder/1498451 for better convergence
 
     def __init__(self, heet, name, description, rules):
         self.heet = heet
