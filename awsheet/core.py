@@ -274,7 +274,7 @@ class InstanceHelper(AWSHelper):
         self.instance_type = heet.get_value('instance_type', kwargs, default='t1.micro')
         self.version = heet.get_value('version', kwargs, default=heet.get_version())
         self.subnet_id = heet.get_value('subnet_id', kwargs, required=False)
-        self.index = heet.get_value('index', kwargs, required=False)
+        self.index = heet.get_value('index', kwargs, default=InstanceHelper.get_count_of_role(role))
         # combine base_security_groups from heet defaults and security_groups from kwargs
         self.base_security_groups = heet.get_value('base_security_groups', default=[])
         self.security_groups = heet.get_value('security_groups', kwargs, default=[])
@@ -431,6 +431,14 @@ class InstanceHelper(AWSHelper):
         self.heet.logger.debug("setting tag %s=%s on instance %s" % (key, value, self.get_instance()))
         self.get_instance().add_tag(key, value)
 
+    role_counts = {}
+    @classmethod
+    def get_count_of_role(cls, role):
+        """Return count of instances with this role. First invocation returns 1, second returns 2, etc."""
+        current_count = cls.role_counts[role] if role in cls.role_counts else 0
+        current_count += 1
+        cls.role_counts[role] = current_count
+        return current_count
 
 class CNAMEHelper(AWSHelper):
     "modular and convergent route53 records"
