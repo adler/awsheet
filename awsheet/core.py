@@ -604,7 +604,7 @@ class GSLBHelper(AWSHelper):
         self.heet.logger.info("deleting healthcheck %s" % healthcheck_id)
         cmd = ['aws', 'route53', 'delete-health-check', '--health-check-id', healthcheck_id]
         try:
-            output = subprocess.check_output(cmd)
+            output = self.heet.exec_awscli(cmd)
         except Exception:
             self.heet.logger.debug("healthcheck %s may not have existed" % healthcheck_id)
 
