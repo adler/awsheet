@@ -273,8 +273,14 @@ class InstanceHelper(AWSHelper):
         self.key_name = heet.get_value('key_name', kwargs, required=False)
         self.instance_type = heet.get_value('instance_type', kwargs, default='t1.micro')
         self.version = heet.get_value('version', kwargs, default=heet.get_version())
-        self.subnet_id = heet.get_value('subnet_id', kwargs, required=False)
         self.index = heet.get_value('index', kwargs, default=InstanceHelper.get_count_of_role(role))
+        # if subnets is provided as a list, pick a round-robin subnet_id
+        self.subnets = heet.get_value('subnets', kwargs, default=[])
+        if (isinstance(self.subnets, list) and len(self.subnets) > 0):
+            default_subnet_id = self.subnets[self.index % len(self.subnets)]
+        else:
+            default_subnet_id = None
+        self.subnet_id = heet.get_value('subnet_id', kwargs, default=default_subnet_id)
         # combine base_security_groups from heet defaults and security_groups from kwargs
         self.base_security_groups = heet.get_value('base_security_groups', default=[])
         self.security_groups = heet.get_value('security_groups', kwargs, default=[])
