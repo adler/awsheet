@@ -3,17 +3,17 @@
 AWSHeet is a lightweight python library that helps you provision all
 your AWS resources.
 
-The goal is to achieve continous delivery by having *all* your
-infrastructure as code. This code needs to be able to safely and
-reliably recreate your entire operating environments.
-
 * automatically provision and configure AWS resources (uses boto and awscli internally)
 * create *equivalent* stacks in production, staging and testing environments
 * build your own scripts based on AWSHeet's idempotent primitives
 * extend AWSHeet with your own custom business logic
 * clean up all resources on demand (terminate instances, delete Route53 records, etc)
 
-*AWSHeet is currently an alpha-stage project. The APIs are not locked down, yet.*
+The goal is to support continous delivery by having *all* your
+infrastructure as code. This code needs to be able to safely and
+reliably recreate your entire operating environments.
+
+*AWSHeet is currently an alpha-stage project. The APIs are not stable, yet.*
 
 ### simple-demo.py
 
