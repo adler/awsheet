@@ -280,7 +280,7 @@ class InstanceHelper(AWSHelper):
             default_subnet_id = self.subnets[self.index % len(self.subnets)]
         else:
             default_subnet_id = None
-        self.subnet_id = heet.get_value('subnet_id', kwargs, default=default_subnet_id)
+        self.subnet_id = heet.get_value('subnet_id', kwargs, default=default_subnet_id, required=False)
         # combine base_security_groups from heet defaults and security_groups from kwargs
         self.base_security_groups = heet.get_value('base_security_groups', default=[])
         self.security_groups = heet.get_value('security_groups', kwargs, default=[])
