@@ -177,9 +177,9 @@ class CloudFormationHelper(AWSHelper):
 
     def stack_name(self):
         if self.version:
-            return self.stack_base_name + '-' + self.environment + '-v' + self.version
+            return self.environment + '-' + self.stack_base_name + '-v' + self.version
         else:
-            return self.stack_base_name + '-' + self.environment
+            return self.environment + '-' + self.stack_base_name
 
     def describe(self):
         try:
@@ -407,7 +407,7 @@ class InstanceHelper(AWSHelper):
 
     def get_basename(self):
         """returns a base name, usually a combination of role and environment"""
-        str = '%s-%s' % (self.role, self.environment)
+        str = '%s-%s' % (self.environment, self.role)
         return re.sub('[^A-z0-9\-]', '-', str)
 
     def get_name(self):
