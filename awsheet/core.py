@@ -107,7 +107,7 @@ class AWSHeet:
             return kwargs[name]
         if (name in self.defaults):
             return self.defaults[name]
-        if (default != None):
+        if (default is not None):
             return default
         if required:
             raise Exception("You are missing a required argument or default value for '%s'." % (name))
@@ -189,14 +189,14 @@ class CloudFormationHelper(AWSHelper):
 
     def status(self):
         stack = self.describe()
-        if stack == None:
+        if stack is None:
             return CloudFormationHelper.DOES_NOT_EXIST
         else:
             return stack.stack_status
 
     def get_output(self, key, default=None):
         stack = self.describe()
-        if stack == None:
+        if stack is None:
             return default
         for output in stack.outputs:
             if output.key == key:
@@ -310,7 +310,7 @@ class InstanceHelper(AWSHelper):
 
     def get_instance(self):
         """cached copy of get_resource_object()"""
-        if not hasattr(self, 'instance') or self.instance == None:
+        if not hasattr(self, 'instance') or self.instance is None:
             self.instance = self.get_resource_object()
         return self.instance
 
