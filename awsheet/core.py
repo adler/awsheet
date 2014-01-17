@@ -327,12 +327,12 @@ class InstanceHelper(AWSHelper):
 
         self.heet.logger.info("provisioning ec2 instance type %s for role=%s and environment=%s" % (self.instance_type, self.role, self.environment))
 
-        # only supporting 1 instance per reservation / helper
         if (self.key_name is None):
             self.key_name = self.find_key_name()
             self.heet.logger.debug("no key_name was provided, so use the first Key Pair from api: '%s'" % self.key_name)
 
         run_kwargs = {
+            # only supporting 1 instance per reservation / helper
             'min_count' : 1,
             'max_count' : 1,
             'key_name' : self.key_name,
@@ -340,8 +340,14 @@ class InstanceHelper(AWSHelper):
             'instance_type' : self.instance_type
             }
 
-        # for arg in ['placement', 'private_ip_address', 'client_token', 'instance_profile_name', 'ebs_optimized', 'dry_run']:
-        #     run_kwargs[arg] = self.heet.get_value(arg, kwargs=self.kwargs)
+        # pass in any possibly argument to run_instances based on constructor args and heet defaults
+        for arg in [
+            'addressing_type', 'placement', 'kernel_id', 'ramdisk_id', 'monitoring_enabled',
+            'block_device_map', 'disable_api_termination', 'instance_initiated_shutdown_behavior',
+            'private_ip_address', 'placement_group', 'client_token', 'additional_info',
+            'instance_profile_name', 'instance_profile_arn', 'tenancy', 'ebs_optimized', 'dry_run'
+            ]:
+            run_kwargs[arg] = self.heet.get_value(arg, kwargs=self.kwargs)
 
         if self.subnet_id:
             # AWS expect security group *ids* when calling via this technique
