@@ -101,13 +101,13 @@ class AWSHeet:
     def get_destroy(self):
         return self.args.destroy
 
-    def get_value(self, name, kwargs={}, default=None, required=True):
+    def get_value(self, name, kwargs={}, default='__unspecified__', required=False):
         """return first existing value from 1) kwargs dict params 2) global heet defaults 3) default param or 4) return None"""
         if (name in kwargs):
             return kwargs[name]
         if (name in self.defaults):
             return self.defaults[name]
-        if (default is not None):
+        if (default != '__unspecified__'):
             return default
         if required:
             raise Exception("You are missing a required argument or default value for '%s'." % (name))
@@ -158,7 +158,7 @@ class CloudFormationHelper(AWSHelper):
 
     def __init__(self, heet, **kwargs):
         self.heet = heet
-        self.stack_base_name = heet.get_value('stack_base_name', kwargs)
+        self.stack_base_name = heet.get_value('stack_base_name', kwargs, required=True)
         self.environment = heet.get_value('environment', kwargs, default=heet.get_environment())
         self.template_file_name = heet.get_value('template_file_name', kwargs)
         self.template = open(self.template_file_name, 'r').read();
@@ -269,8 +269,9 @@ class InstanceHelper(AWSHelper):
         self.heet = heet
         self.role = role
         self.environment = heet.get_value('environment', kwargs, default=heet.get_environment())
-        self.ami = heet.get_value('ami', kwargs)
-        self.key_name = heet.get_value('key_name', kwargs, required=False)
+        self.ami = heet.get_value('ami', kwargs, required=True)
+        self.kwargs = kwargs
+        self.key_name = heet.get_value('key_name', kwargs)
         self.instance_type = heet.get_value('instance_type', kwargs, default='t1.micro')
         self.version = heet.get_value('version', kwargs, default=heet.get_version())
         self.index = heet.get_value('index', kwargs, default=InstanceHelper.get_count_of_role(role))
@@ -280,12 +281,12 @@ class InstanceHelper(AWSHelper):
             default_subnet_id = self.subnets[self.index % len(self.subnets)]
         else:
             default_subnet_id = None
-        self.subnet_id = heet.get_value('subnet_id', kwargs, default=default_subnet_id, required=False)
+        self.subnet_id = heet.get_value('subnet_id', kwargs, default=default_subnet_id)
         # combine base_security_groups from heet defaults and security_groups from kwargs
         self.base_security_groups = heet.get_value('base_security_groups', default=[])
         self.security_groups = heet.get_value('security_groups', kwargs, default=[])
         self.security_groups.extend(self.base_security_groups)
-        user_data = heet.get_value('user_data', kwargs, required=False)
+        user_data = heet.get_value('user_data', kwargs)
         self.user_data = json.dumps(user_data) if type(user_data) == dict else user_data
         self.conn = boto.ec2.connect_to_region(
             heet.get_region(),
@@ -325,20 +326,22 @@ class InstanceHelper(AWSHelper):
         """ask EC2 for a new instance and return boto ec2 instance object"""
 
         self.heet.logger.info("provisioning ec2 instance type %s for role=%s and environment=%s" % (self.instance_type, self.role, self.environment))
-        # only tested with vpc-style accounts
-        # only supporting 1 instance per reservation / helper
 
+        # only supporting 1 instance per reservation / helper
         if (self.key_name is None):
             self.key_name = self.find_key_name()
             self.heet.logger.debug("no key_name was provided, so use the first Key Pair from api: '%s'" % self.key_name)
 
-        kwargs = {
+        run_kwargs = {
             'min_count' : 1,
             'max_count' : 1,
             'key_name' : self.key_name,
             'user_data' : self.user_data,
             'instance_type' : self.instance_type
             }
+
+        # for arg in ['placement', 'private_ip_address', 'client_token', 'instance_profile_name', 'ebs_optimized', 'dry_run']:
+        #     run_kwargs[arg] = self.heet.get_value(arg, kwargs=self.kwargs)
 
         if self.subnet_id:
             # AWS expect security group *ids* when calling via this technique
@@ -349,13 +352,13 @@ class InstanceHelper(AWSHelper):
                 associate_public_ip_address=True
                 )
             interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
-            kwargs['network_interfaces'] = interfaces
+            run_kwargs['network_interfaces'] = interfaces
         else:
             # AWS expect security groups *names* when calling via this technique
-            kwargs['security_groups'] = self.security_groups
+            run_kwargs['security_groups'] = self.security_groups
 
-        #kwargs['dry_run'] = True
-        reservation = self.conn.run_instances(self.ami, **kwargs)
+        #run_kwargs['dry_run'] = True
+        reservation = self.conn.run_instances(self.ami, **run_kwargs)
         return reservation.instances[0]
 
     def wait_unil_ready(self):
@@ -421,14 +424,14 @@ class InstanceHelper(AWSHelper):
     def get_dnsname(self):
         """returns a unique dns name based on get_name()/get_basename() including domain. Return None when no domain provided or other exception"""
         try:
-            return self.get_name() + self.heet.get_value('domain')
+            return self.get_name() + self.heet.get_value('domain', required=True)
         except:
             return None
 
     def get_index_dnsname(self):
         """returns a unique dns name based on instance get_basename() and index including domain. Return None when no domain provided or other exception"""
         try:
-            return "%s-%02d%s" % (self.get_basename(), self.index, self.heet.get_value('domain'))
+            return "%s-%02d%s" % (self.get_basename(), self.index, self.heet.get_value('domain', required=True))
         except:
             return None
 
@@ -453,8 +456,8 @@ class CNAMEHelper(AWSHelper):
         self.heet = heet
         self.name = name
         self.value = value
-        self.zone_id = self.heet.get_value('zone_id')
-        self.domain = self.heet.get_value('domain')
+        self.zone_id = self.heet.get_value('zone_id', required=True)
+        self.domain = self.heet.get_value('domain', required=True)
         self.ttl = self.heet.get_value('ttl', kwargs, default=300)
         self.conn = boto.connect_route53(
             aws_access_key_id=heet.access_key_id,
@@ -498,10 +501,10 @@ class GSLBHelper(AWSHelper):
         # normalize name to have trailing '.'
         self.name = name.rstrip('.') + '.'
         self.target = target
-        self.healthcheck_path = self.heet.get_value('healthcheck_path', kwargs)
+        self.healthcheck_path = self.heet.get_value('healthcheck_path', kwargs, default='/')
         self.healthcheck_port = self.heet.get_value('healthcheck_port', kwargs, default=80)
         self.ttl = self.heet.get_value('ttl', kwargs, default=300)
-        self.zone_id = self.heet.get_value('zone_id')
+        self.zone_id = self.heet.get_value('zone_id', required=True)
         heet.add_resource(self)
 
     def __str__(self):
@@ -620,7 +623,7 @@ class SecurityGroupHelper(AWSHelper):
         self.rules = rules
         # TODO vpc_id option
         self.conn = boto.ec2.connect_to_region(
-            heet.get_value('region'),
+            heet.get_region(),
             aws_access_key_id=heet.access_key_id,
             aws_secret_access_key=heet.secret_access_key)
         heet.add_resource(self)
