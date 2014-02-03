@@ -446,8 +446,11 @@ class InstanceHelper(AWSHelper):
 
     def set_tag(self, key, value):
         """add tag to the instance. This operation is idempotent. Tags are automatically destroyed when instances are terminated"""
-        self.heet.logger.debug("setting tag %s=%s on instance %s" % (key, value, self.get_instance()))
-        self.get_instance().add_tag(key, value)
+        instance = self.get_instance()
+        if key in instance.tags and instance.tags[key] == value:
+            return
+        self.heet.logger.debug("setting tag %s=%s on instance %s" % (key, value, instance))
+        instance.add_tag(key, value)
 
     role_counts = {}
     @classmethod
