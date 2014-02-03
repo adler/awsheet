@@ -92,6 +92,9 @@ class AWSHeet:
     def get_region(self):
         return self.get_value('region', default='us-east-1')
 
+    def get_project(self):
+        return self.base_name
+
     def get_version(self):
         return self.args.version if self.args.version else 0
 
