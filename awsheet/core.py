@@ -678,7 +678,7 @@ class SecurityGroupHelper(AWSHelper):
                 time.sleep(3)
 
 class VolumeHelper(AWSHelper):
-    "modular and convergent EBS volumes"
+    "modular and convergent EBS volumes. support for standard and io1 types (provisioned iops)"
 
     def __init__(self, heet, size, instance, name, device, zone=None, snapshot=None, volume_type=None, iops=None, dry_run=False):
         self.heet = heet
