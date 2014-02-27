@@ -272,10 +272,20 @@ class InstanceHelper(AWSHelper):
         self.heet = heet
         self.role = role
         self.environment = heet.get_value('environment', kwargs, default=heet.get_environment())
-        self.ami = heet.get_value('ami', kwargs, required=True)
         self.kwargs = kwargs
+        self.ami = heet.get_value('ami', kwargs)
+        self.pv_ami = heet.get_value('pv_ami', kwargs)
+        self.hvm_ami = heet.get_value('hvm_ami', kwargs)
         self.key_name = heet.get_value('key_name', kwargs)
         self.instance_type = heet.get_value('instance_type', kwargs, default='t1.micro')
+        # if instance does not support pv ami, use the default hvm_ami if defined
+        if not self.supports_pv() and not self.hvm_ami is None:
+            self.heet.logger.debug("using hvm_ami %s because %s instances require hvm" %
+                                   (self.hvm_ami, self.instance_type))
+            self.ami = self.hvm_ami
+        # if self.ami is not defined (by default or via parameter), use the default pv_ami if defined
+        if self.ami is None and not self.pv_ami is None:
+            self.ami = self.pv_ami
         self.version = heet.get_value('version', kwargs, default=heet.get_version())
         self.index = heet.get_value('index', kwargs, default=InstanceHelper.get_count_of_role(role))
         # if subnets is provided as a list, pick a round-robin subnet_id
@@ -460,6 +470,11 @@ class InstanceHelper(AWSHelper):
         current_count += 1
         cls.role_counts[role] = current_count
         return current_count
+
+    def supports_pv(self):
+        """Return True when self.instance_type can boot from paravirtual EBS image (not HVM)
+        http://aws.amazon.com/amazon-linux-ami/instance-type-matrix/"""
+        return not re.search('^(i2|cc2|g2|cg1)\.', self.instance_type)
 
 class CNAMEHelper(AWSHelper):
     "modular and convergent route53 records"
