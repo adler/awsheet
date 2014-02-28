@@ -501,11 +501,18 @@ class CNAMEHelper(AWSHelper):
         return self.record
 
     def converge(self):
-        if self.get_resource_object():
-            return self
         # if the target is a subclass of AWSHelper, execute the overloaded method to get the true target
         if isinstance(self.value, AWSHelper):
             self.value = self.value.get_cname_target()
+        current_record = self.get_resource_object()
+        if current_record.resource_records:
+            current_value = current_record.resource_records[0]
+            # if CNAME already exists AND points at correct value, do nothing
+            if current_value == self.value:
+                return self
+            # if CNAME already exists AND points at wrong value, delete it before creating new record
+            self.heet.logger.info("deleting old CNAME record %s to %s" % (self.name, current_value))
+            self.zone.delete_cname(self.name)
         self.heet.logger.info("creating CNAME record %s to %s for ttl=%s" % (self.name, self.value, self.ttl))
         changes = boto.route53.record.ResourceRecordSets(self.conn, self.zone_id)
         change = changes.add_change("CREATE", self.name, "CNAME", self.ttl)
