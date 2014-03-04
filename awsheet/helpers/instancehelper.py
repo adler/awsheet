@@ -1,6 +1,6 @@
-from awsheetcore import AWSHeet
-from awshelper import AWSHelper
-from cnamehelper import CNAMEHelper
+from .. awsheetcore import AWSHeet
+from . awshelper import AWSHelper
+from . cnamehelper import CNAMEHelper
 import time
 import re
 import os

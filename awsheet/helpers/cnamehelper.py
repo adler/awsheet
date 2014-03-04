@@ -1,4 +1,4 @@
-from awshelper import AWSHelper
+from . awshelper import AWSHelper
 import time
 import re
 import os
