@@ -1,4 +1,3 @@
-from awsheetcore import AWSHeet
 from awshelper import AWSHelper
 import time
 import re

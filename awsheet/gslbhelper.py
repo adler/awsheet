@@ -1,5 +1,4 @@
 from awshelper import AWSHelper
-from instancehelper import InstanceHelper
 
 import time
 import re
