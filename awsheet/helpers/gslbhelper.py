@@ -1,3 +1,19 @@
+from awshelper import AWSHelper
+
+import time
+import re
+import os
+import json
+import subprocess
+import tempfile
+import argparse
+import sys
+import logging
+import atexit
+import boto
+import boto.ec2
+import boto.ec2.elb
+import boto.cloudformation
 class GSLBHelper(AWSHelper):
     """modular and convergent weighted+healthchecked dns records. AFAIK, boto 2.21 does not support creating records with healthchecks, so shell out to aws"""
 

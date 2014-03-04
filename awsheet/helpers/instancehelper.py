@@ -1,3 +1,18 @@
+from awshelper import AWSHelper
+import time
+import re
+import os
+import json
+import subprocess
+import tempfile
+import argparse
+import sys
+import logging
+import atexit
+import boto
+import boto.ec2
+import boto.ec2.elb
+import boto.cloudformation
 
 class InstanceHelper(AWSHelper):
     "modular and convergent ec2 instances"

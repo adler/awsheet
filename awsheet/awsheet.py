@@ -1,3 +1,13 @@
+import re
+import os
+import subprocess
+import argparse
+import sys
+import logging
+import atexit
+import boto
+import boto.ec2
+import boto.ec2.elb
 
 class AWSHeet:
 
