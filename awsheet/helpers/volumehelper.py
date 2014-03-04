@@ -1,4 +1,4 @@
-from .. awsheet import AWSHeet
+from .. awsheetcore import AWSHeet
 from . awshelper import AWSHelper
 import time
 import re
