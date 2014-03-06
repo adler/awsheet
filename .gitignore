@@ -3,3 +3,4 @@
 awsheet.egg-info/
 _build/
 dist/
+build/*
