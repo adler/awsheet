@@ -1,5 +1,5 @@
-from .. awsheetcore import AWSHeet
-from . awshelper import AWSHelper
+from ..awsheetcore import AWSHeet
+from .awshelper import AWSHelper
 import time
 import re
 import os
