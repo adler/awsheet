@@ -18,10 +18,11 @@ import boto.cloudformation
 
 class InstanceHelper(AWSHelper):
     "modular and convergent ec2 instances"
-    def __init__(self, heet, role, **kwargs):
+    def __init__(self, heet, role, normalize_name=False, **kwargs):
         self.heet = heet
         self.role = role
         self.environment = heet.get_value('environment', kwargs, default=heet.get_environment())
+        self.normalize_name = normalize_name
         self.kwargs = kwargs
         self.ami = heet.get_value('ami', kwargs)
         self.pv_ami = heet.get_value('pv_ami', kwargs)
@@ -148,9 +149,9 @@ class InstanceHelper(AWSHelper):
         self.set_tag(AWSHeet.TAG, self.unique_tag)
         self.set_tag('Name', self.get_name())
         if self.get_dnsname():
-            CNAMEHelper(self.heet, self.get_dnsname(), self)
+            CNAMEHelper(self.heet, self.get_dnsname(), self, normalize_name=self.normalize_name)
         if self.get_index_dnsname():
-            CNAMEHelper(self.heet, self.get_index_dnsname(), self)
+            CNAMEHelper(self.heet, self.get_index_dnsname(), self, normalize_name=self.normalize_name)
         self.post_converge_hook()
         name = self.get_dnsname()
         if not name:
