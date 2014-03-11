@@ -1,4 +1,4 @@
-from ..awsheetcore import AWSHeet
+from ..core import AWSHeet
 from .awshelper import AWSHelper
 from .cnamehelper import CNAMEHelper
 import time
