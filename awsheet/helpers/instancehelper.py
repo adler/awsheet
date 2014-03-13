@@ -41,7 +41,8 @@ class InstanceHelper(AWSHelper):
         # if subnets is provided as a list, pick a round-robin subnet_id
         self.subnets = heet.get_value('subnets', kwargs, default=[])
         if (isinstance(self.subnets, list) and len(self.subnets) > 0):
-            default_subnet_id = self.subnets[self.index % len(self.subnets)]
+            # self.index is one-based so subtract one to get zero-based
+            default_subnet_id = self.subnets[(self.index - 1) % len(self.subnets)]
         else:
             default_subnet_id = None
         self.subnet_id = heet.get_value('subnet_id', kwargs, default=default_subnet_id)
