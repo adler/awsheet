@@ -1,6 +1,6 @@
 from ..core import AWSHeet
 from .awshelper import AWSHelper
-from .cnamehelper import CNAMEHelper
+from .nicknamehelper import NickNameHelper
 import time
 import re
 import os
@@ -46,6 +46,8 @@ class InstanceHelper(AWSHelper):
         else:
             default_subnet_id = None
         self.subnet_id = heet.get_value('subnet_id', kwargs, default=default_subnet_id)
+        # TODO determine public automatically based on default route of subnet
+        self.public = heet.get_value('associate_public_ip_address', kwargs, default=True)
         # combine base_security_groups from heet defaults and security_groups from kwargs
         self.base_security_groups = heet.get_value('base_security_groups', default=[])
         self.security_groups = heet.get_value('security_groups', kwargs, default=[])
@@ -119,7 +121,7 @@ class InstanceHelper(AWSHelper):
             interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(
                 subnet_id=self.subnet_id,
                 groups=self.security_groups,
-                associate_public_ip_address=True
+                associate_public_ip_address=self.public
                 )
             interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
             run_kwargs['network_interfaces'] = interfaces
@@ -149,9 +151,9 @@ class InstanceHelper(AWSHelper):
         self.set_tag(AWSHeet.TAG, self.unique_tag)
         self.set_tag('Name', self.get_name())
         if self.get_dnsname():
-            CNAMEHelper(self.heet, self.get_dnsname(), self)
+            NickNameHelper(self.heet, self.get_dnsname(), self)
         if self.get_index_dnsname():
-            CNAMEHelper(self.heet, self.get_index_dnsname(), self)
+            NickNameHelper(self.heet, self.get_index_dnsname(), self)
         self.post_converge_hook()
         name = self.get_dnsname()
         if not name:
@@ -168,15 +170,18 @@ class InstanceHelper(AWSHelper):
             return
         self.pre_destroy_hook()
         if self.get_dnsname():
-            CNAMEHelper(self.heet, self.get_dnsname(), self).destroy()
+            NickNameHelper(self.heet, self.get_dnsname(), self).destroy()
         if self.get_index_dnsname():
-            CNAMEHelper(self.heet, self.get_index_dnsname(), self).destroy()
+            NickNameHelper(self.heet, self.get_index_dnsname(), self).destroy()
         self.heet.logger.info("terminating %s" % instance)
         self.conn.terminate_instances([instance.id])
 
     def get_cname_target(self):
         """returns public_dns_name"""
-        return self.get_instance().public_dns_name
+        if self.public:
+            return self.get_instance().public_dns_name
+        else:
+            return self.get_instance().private_ip_address
 
     def get_basename(self):
         """returns a base name, usually a combination of role and environment"""
