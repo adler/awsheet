@@ -15,6 +15,7 @@ import boto
 import boto.ec2
 import boto.ec2.elb
 import boto.cloudformation
+import boto.vpc
 
 class InstanceHelper(AWSHelper):
     "modular and convergent ec2 instances"
@@ -46,8 +47,6 @@ class InstanceHelper(AWSHelper):
         else:
             default_subnet_id = None
         self.subnet_id = heet.get_value('subnet_id', kwargs, default=default_subnet_id)
-        # TODO determine public automatically based on default route of subnet
-        self.public = heet.get_value('associate_public_ip_address', kwargs, default=True)
         # combine base_security_groups from heet defaults and security_groups from kwargs
         self.base_security_groups = heet.get_value('base_security_groups', default=[])
         self.security_groups = heet.get_value('security_groups', kwargs, default=[])
@@ -58,6 +57,12 @@ class InstanceHelper(AWSHelper):
             heet.get_region(),
             aws_access_key_id=heet.access_key_id,
             aws_secret_access_key=heet.secret_access_key)
+        self.vpc_conn = boto.vpc.connect_to_region(
+            heet.get_region(),
+            aws_access_key_id=heet.access_key_id,
+            aws_secret_access_key=heet.secret_access_key)
+        self.public = heet.get_value('associate_public_ip_address', kwargs, default=self.is_subnet_public(self.subnet_id))
+
         # need unique way of identifying the instance based upon the inputs of this class (i.e. not the EC2 instance-id)
         #self.unique_tag = '%s__%s__v%s__i%s' % (self.role, self.environment, self.version, self.index)
         self.unique_tag = '%s/%s/v=%s/%s/%s/index=%s/%s' % (self.heet.base_name, self.environment, self.version, self.ami, self.instance_type, self.index, self.role)
@@ -217,6 +222,31 @@ class InstanceHelper(AWSHelper):
             return
         self.heet.logger.debug("setting tag %s=%s on instance %s" % (key, value, instance))
         instance.add_tag(key, value)
+
+    # cache whether or not a subnet is public or private
+    subnet_public = {}
+
+    def is_subnet_public(self, subnet_id):
+        """returns true if the Subnet is associated with a Route Table with a default route to an Internet Gateway"""
+
+        # cache whether or not a subnet is public or private
+        if subnet_id in InstanceHelper.subnet_public:
+            return InstanceHelper.subnet_public[subnet_id]
+
+        # get the route table associated with this subnet (or the default/main route table)
+        route_tables = self.vpc_conn.get_all_route_tables(None, filters={'association.subnet-id': subnet_id})
+        if len(route_tables) == 0:
+            route_tables = self.vpc_conn.get_all_route_tables(None, filters={'association.main': 'true' })
+        route_table = route_tables[0]
+
+        # find the default route in the table and see if it points at an internet gateway
+        public = False
+        for r in route_table.routes:
+            if r.destination_cidr_block == '0.0.0.0/0' and r.gateway_id and re.match('^igw-', r.gateway_id):
+                public = True
+
+        InstanceHelper.subnet_public[subnet_id] = public
+        return public
 
     role_counts = {}
     @classmethod
