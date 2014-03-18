@@ -1,6 +1,6 @@
-from ..awsheetcore import AWSHeet
+from ..core import AWSHeet
 from .awshelper import AWSHelper
-from .cnamehelper import CNAMEHelper
+from .nicknamehelper import NickNameHelper
 import time
 import re
 import os
@@ -15,6 +15,7 @@ import boto
 import boto.ec2
 import boto.ec2.elb
 import boto.cloudformation
+import boto.vpc
 
 class InstanceHelper(AWSHelper):
     "modular and convergent ec2 instances"
@@ -42,7 +43,8 @@ class InstanceHelper(AWSHelper):
         # if subnets is provided as a list, pick a round-robin subnet_id
         self.subnets = heet.get_value('subnets', kwargs, default=[])
         if (isinstance(self.subnets, list) and len(self.subnets) > 0):
-            default_subnet_id = self.subnets[self.index % len(self.subnets)]
+            # self.index is one-based so subtract one to get zero-based
+            default_subnet_id = self.subnets[(self.index - 1) % len(self.subnets)]
         else:
             default_subnet_id = None
         self.subnet_id = heet.get_value('subnet_id', kwargs, default=default_subnet_id)
@@ -56,6 +58,12 @@ class InstanceHelper(AWSHelper):
             heet.get_region(),
             aws_access_key_id=heet.access_key_id,
             aws_secret_access_key=heet.secret_access_key)
+        self.vpc_conn = boto.vpc.connect_to_region(
+            heet.get_region(),
+            aws_access_key_id=heet.access_key_id,
+            aws_secret_access_key=heet.secret_access_key)
+        self.public = heet.get_value('associate_public_ip_address', kwargs, default=self.is_subnet_public(self.subnet_id))
+
         # need unique way of identifying the instance based upon the inputs of this class (i.e. not the EC2 instance-id)
         #self.unique_tag = '%s__%s__v%s__i%s' % (self.role, self.environment, self.version, self.index)
         self.unique_tag = '%s/%s/v=%s/%s/%s/index=%s/%s' % (self.heet.base_name, self.environment, self.version, self.ami, self.instance_type, self.index, self.role)
@@ -119,7 +127,7 @@ class InstanceHelper(AWSHelper):
             interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(
                 subnet_id=self.subnet_id,
                 groups=self.security_groups,
-                associate_public_ip_address=True
+                associate_public_ip_address=self.public
                 )
             interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
             run_kwargs['network_interfaces'] = interfaces
@@ -149,9 +157,9 @@ class InstanceHelper(AWSHelper):
         self.set_tag(AWSHeet.TAG, self.unique_tag)
         self.set_tag('Name', self.get_name())
         if self.get_dnsname():
-            CNAMEHelper(self.heet, self.get_dnsname(), self, normalize_name=self.normalize_name)
+            NickNameHelper(self.heet, self.get_dnsname(), self)
         if self.get_index_dnsname():
-            CNAMEHelper(self.heet, self.get_index_dnsname(), self, normalize_name=self.normalize_name)
+            NickNameHelper(self.heet, self.get_index_dnsname(), self)
         self.post_converge_hook()
         name = self.get_dnsname()
         if not name:
@@ -168,15 +176,18 @@ class InstanceHelper(AWSHelper):
             return
         self.pre_destroy_hook()
         if self.get_dnsname():
-            CNAMEHelper(self.heet, self.get_dnsname(), self).destroy()
+            NickNameHelper(self.heet, self.get_dnsname(), self).destroy()
         if self.get_index_dnsname():
-            CNAMEHelper(self.heet, self.get_index_dnsname(), self).destroy()
+            NickNameHelper(self.heet, self.get_index_dnsname(), self).destroy()
         self.heet.logger.info("terminating %s" % instance)
         self.conn.terminate_instances([instance.id])
 
     def get_cname_target(self):
         """returns public_dns_name"""
-        return self.get_instance().public_dns_name
+        if self.public:
+            return self.get_instance().public_dns_name
+        else:
+            return self.get_instance().private_ip_address
 
     def get_basename(self):
         """returns a base name, usually a combination of role and environment"""
@@ -212,6 +223,31 @@ class InstanceHelper(AWSHelper):
             return
         self.heet.logger.debug("setting tag %s=%s on instance %s" % (key, value, instance))
         instance.add_tag(key, value)
+
+    # cache whether or not a subnet is public or private
+    subnet_public = {}
+
+    def is_subnet_public(self, subnet_id):
+        """returns true if the Subnet is associated with a Route Table with a default route to an Internet Gateway"""
+
+        # cache whether or not a subnet is public or private
+        if subnet_id in InstanceHelper.subnet_public:
+            return InstanceHelper.subnet_public[subnet_id]
+
+        # get the route table associated with this subnet (or the default/main route table)
+        route_tables = self.vpc_conn.get_all_route_tables(None, filters={'association.subnet-id': subnet_id})
+        if len(route_tables) == 0:
+            route_tables = self.vpc_conn.get_all_route_tables(None, filters={'association.main': 'true' })
+        route_table = route_tables[0]
+
+        # find the default route in the table and see if it points at an internet gateway
+        public = False
+        for r in route_table.routes:
+            if r.destination_cidr_block == '0.0.0.0/0' and r.gateway_id and re.match('^igw-', r.gateway_id):
+                public = True
+
+        InstanceHelper.subnet_public[subnet_id] = public
+        return public
 
     role_counts = {}
     @classmethod

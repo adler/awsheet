@@ -1,4 +1,4 @@
-from .awsheetcore import *
+from .core import *
 from .helpers.awshelper import AWSHelper
 from .helpers.cloudformationhelper import CloudFormationHelper
 from .helpers.cnamehelper import CNAMEHelper
