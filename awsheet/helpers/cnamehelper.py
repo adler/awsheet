@@ -17,7 +17,7 @@ import boto.cloudformation
 class CNAMEHelper(AWSHelper):
     "modular and convergent route53 records"
 
-    def __init__(self, heet, name, value, normalize_name=False, **kwargs):
+    def __init__(self, heet, name, value, normalize_name=True, **kwargs):
         self.heet = heet
         if normalize_name is True:
             self.name = self.normalize_name(name)
