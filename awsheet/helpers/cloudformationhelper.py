@@ -78,7 +78,11 @@ class CloudFormationHelper(AWSHelper):
 
     def create(self):
         self.heet.logger.info("creating CloudFormation stack '%s'" % self.stack_name())
-        self.conn.create_stack(self.stack_name(), template_body=self.template, parameters=self.parameters)
+        self.conn.create_stack(
+            self.stack_name(),
+            template_body=self.template,
+            parameters=self.parameters,
+            capabilities=['CAPABILITY_IAM'])
 
     def update(self):
         try:
