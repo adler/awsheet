@@ -13,7 +13,7 @@ class AWSHeet:
 
     TAG = 'AWSHeet'
 
-    def __init__(self, defaults={}):
+    def __init__(self, defaults={}, name=None):
         self.defaults = defaults
         self.resources = []
         self.parse_args()
@@ -25,7 +25,13 @@ class AWSHeet:
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         self.base_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
-        self.base_name = re.search('(.*)\.[^\.]*$', os.path.basename(sys.argv[0])).group(1)
+
+        #- allow user to explicitly set project name
+        if name is None:
+            self.base_name = os.path.basename(sys.argv[0]).split('.')[0]
+        else:
+            self.base_name = name
+
         self.load_creds()
         atexit.register(self._finalize)
 
