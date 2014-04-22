@@ -41,8 +41,8 @@ class NickNameHelper(AWSHelper):
             if current_value == self.value:
                 return self
             # if record already exists AND points at wrong value, delete it before creating new record
-            self.heet.logger.info("deleting old CNAME record %s to %s" % (self.name, current_value))
-            self.zone.delete_cname(self.name)
+            self.heet.logger.info("deleting old record %s to %s" % (self.name, current_value))
+            self.zone.delete_record(current_record)
 
         # If the target is an IP address, we must create an A
         # record. If the target is a DNS name, we want a CNAME
