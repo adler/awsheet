@@ -19,10 +19,11 @@ import boto.vpc
 
 class InstanceHelper(AWSHelper):
     "modular and convergent ec2 instances"
-    def __init__(self, heet, role, **kwargs):
+    def __init__(self, heet, role, normalize_name=False, **kwargs):
         self.heet = heet
         self.role = role
         self.environment = heet.get_value('environment', kwargs, default=heet.get_environment())
+        self.normalize_name = normalize_name
         self.kwargs = kwargs
         self.ami = heet.get_value('ami', kwargs)
         self.pv_ami = heet.get_value('pv_ami', kwargs)

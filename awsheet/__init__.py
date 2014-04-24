@@ -5,4 +5,5 @@ from .helpers.cnamehelper import CNAMEHelper
 from .helpers.gslbhelper import GSLBHelper
 from .helpers.instancehelper import InstanceHelper
 from .helpers.securitygrouphelper import SecurityGroupHelper
+from .helpers.securitygrouphelper import SecurityGroupRule
 from .helpers.volumehelper import VolumeHelper

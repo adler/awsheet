@@ -17,9 +17,13 @@ import boto.cloudformation
 class CNAMEHelper(AWSHelper):
     "modular and convergent route53 records"
 
-    def __init__(self, heet, name, value, **kwargs):
+    def __init__(self, heet, name, value, normalize_name=True, **kwargs):
         self.heet = heet
-        self.name = name
+        if normalize_name is True:
+            self.name = self.normalize_name(name)
+        else:
+            self.name = name
+
         self.value = value
         self.zone_id = self.heet.get_value('zone_id', required=True)
         self.domain = self.heet.get_value('domain', required=True)
@@ -37,6 +41,11 @@ class CNAMEHelper(AWSHelper):
     def get_resource_object(self):
         self.record = self.zone.get_cname(self.name)
         return self.record
+
+    def normalize_name(self, name):
+        """Apply normalization logic to the name we are creating.
+        Currently this only replaces underscores with dashes"""
+        return name.replace('_','-')
 
     def converge(self):
         # if the target is a subclass of AWSHelper, execute the overloaded method to get the true target
