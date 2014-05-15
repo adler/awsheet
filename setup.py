@@ -10,7 +10,7 @@ def read(fname):
 
 setup(
     name = "awsheet",
-    version = "0.0.5",
+    version = "0.0.6",
     author = "Mike Adler",
     author_email = "adler@stuntbeard.com",
     description = ("build repeatable stacks of AWS resources across prod and dev"),
