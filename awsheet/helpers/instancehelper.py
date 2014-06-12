@@ -137,6 +137,8 @@ class InstanceHelper(AWSHelper):
         reservation = self.conn.run_instances(self.ami, **run_kwargs)
         return reservation.instances[0]
 
+
+
     def wait_unil_ready(self):
         while True:
             try:
@@ -147,6 +149,22 @@ class InstanceHelper(AWSHelper):
             except boto.exception.EC2ResponseError as e:
                 self.heet.logger.debug("waiting for instance %s" % self.instance)
             time.sleep(3)
+
+
+
+    def wait_until_terminated(self):
+        while True:
+            try:
+                self.instance.update()
+                if self.instance.state == 'terminated':
+                    break
+                self.heet.logger.debug("%s state=%s" % (self.instance, self.instance.state))
+            except boto.exception.EC2ResponseError as e:
+                self.heet.logger.debug("waiting for instance %s" % self.instance)
+            time.sleep(3)
+        return
+
+
 
     def converge(self):
         if not self.get_instance():
@@ -167,6 +185,8 @@ class InstanceHelper(AWSHelper):
         self.heet.logger.info("the following instance is ready '%s'" % name)
         return self
 
+
+
     def destroy(self):
         # TODO consider deleting all CNAMEs that point to public dns name
         instance = self.get_instance()
@@ -179,6 +199,10 @@ class InstanceHelper(AWSHelper):
             NickNameHelper(self.heet, self.get_index_dnsname(), self).destroy()
         self.heet.logger.info("terminating %s" % instance)
         self.conn.terminate_instances([instance.id])
+        self.wait_until_terminated()
+        return
+
+
 
     def get_cname_target(self):
         """returns public_dns_name"""
@@ -217,10 +241,14 @@ class InstanceHelper(AWSHelper):
     def set_tag(self, key, value):
         """add tag to the instance. This operation is idempotent. Tags are automatically destroyed when instances are terminated"""
         instance = self.get_instance()
-        if key in instance.tags and instance.tags[key] == value:
-            return
-        self.heet.logger.debug("setting tag %s=%s on instance %s" % (key, value, instance))
-        instance.add_tag(key, value)
+        if instance is None:
+            self.heet.logger.debug("Can't set tag on null instance")
+
+        else:
+            if key in instance.tags and instance.tags[key] == value:
+                return
+            self.heet.logger.debug("setting tag %s=%s on instance %s" % (key, value, instance))
+            instance.add_tag(key, value)
 
     # cache whether or not a subnet is public or private
     subnet_public = {}

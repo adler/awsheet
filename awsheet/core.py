@@ -8,6 +8,7 @@ import atexit
 import boto
 import boto.ec2
 import boto.ec2.elb
+import collections
 
 class AWSHeet:
 
@@ -33,7 +34,21 @@ class AWSHeet:
             self.base_name = name
 
         self.load_creds()
+
+        #- resource reference table - this is used to refer to other resources by '@-name'
+        self.resource_refs = dict()
+
+        #- If a resource needs some events to occur before it can fully converge then 
+        #- it must converge in 2 phases.
+        #- In the second phase the resource can assume the resource reference table is complete
+
+        #- It implements the second phase of convergence by declaring itself as a dependent resource
+        #- Heet will register that resources converge_dependency() method to run at exit
+        self.dependent_resources = dict()
+
         atexit.register(self._finalize)
+
+
 
     def load_creds(self):
         """Load credentials in preferred order 1) from x.auth file 2) from environmental vars or 3) from ~/.boto config"""
@@ -49,6 +64,8 @@ class AWSHeet:
 
         self.logger.debug("using account AWS_ACCESS_KEY_ID=%s" % self.access_key_id)
 
+
+
     def parse_creds_from_file(self, filename):
         if not os.path.exists(filename):
             return
@@ -61,11 +78,53 @@ class AWSHeet:
                 if match:
                     self.secret_access_key = match.group(1)
 
+
+
+    def is_resource_ref(self, ref_str):
+        """Tests if ref_str is in a format that can be considered a resource reference
+        Currently this format is not yet enforced anywhere."""
+        if isinstance(ref_str, collections.Sequence) and ref_str[0] == '@':
+            return True
+        else:
+            return False
+
+
+
+    def add_resource_ref(self, resource, resource_ref_key):
+        """Adds a resource to a dictionary so it can be referred to by a name / key
+        Essentially the resource list, but without ordering constraints and with a requirement
+        for random access of specific, named resources"""
+        self.resource_refs[resource_ref_key] = resource
+
+
+
     def add_resource(self, resource):
+        """Adds resources to a list and calls that resource's converge method"""
         self.resources.append(resource)
         if not self.args.destroy:
+            #-TODO: catch exceptions in the converge() cycle
+            #- to avoid calling the atexit functions
+            #- when we are exiting because of an error
             resource.converge()
+
         return resource
+
+
+
+    def add_dependent_resource(self, dependent_resource, key_name):
+        """Adds resources to a list and registers that resource's converge_dependency() method
+        to be called at program exit and passes it the resource_name that it passed us.
+        When a resource calls this, it also passes in a tag, used internally as a dict key, so that
+        if a resource makes multiple calls to this, they can associate a string with each dependent
+        event that they need to handle when the resource's converge_dependency() method is called back
+        self.dependent_resources[key_name] = dependent_resource
+        at program exit. 
+
+        Callbacks and tags are issued at exit in LIFO order."""
+        atexit.register(dependent_resource.converge_dependency, key_name)
+        return
+
+
 
     def _finalize(self):
         """Run this function automatically atexit. If --destroy flag is use, destroy all resouces in reverse order"""
@@ -81,15 +140,22 @@ class AWSHeet:
             exit(1)
         for resource in reversed(self.resources):
             resource.destroy()
-        self.logger.info("all AWS resources in [ %s / %s ] are destroyed" % (self.base_name, self.get_environment()))
+        self.logger.info("all AWS resources in [ %s / %s ] have had destroy() called" % (self.base_name, self.get_environment()))
+
+
 
     def parse_args(self):
         parser = argparse.ArgumentParser(description='create and destroy AWS resources idempotently')
         parser.add_argument('-d', '--destroy', help='release the resources (terminate instances, delete stacks, etc)', action='store_true')
         parser.add_argument('-e', '--environment', help='e.g. production, staging, testing, etc', default='testing')
-        parser.add_argument('-v', '--version', help='create/destroy resources associated with a version to support having multiple versions of resources running at the same time. Some resources are not possibly able to support versions - such as CNAMEs without a version string.')
+        parser.add_argument('-v', '--version', help='create/destroy resources associated with a version to support '
+                                                    'having multiple versions of resources running at the same time. '
+                                                    'Some resources are not possibly able to support versions - '
+                                                    'such as CNAMEs without a version string.')
         #parser.add_argument('-n', '--dry-run', help='environment', action='store_true')
         self.args = parser.parse_args()
+
+
 
     def get_region(self):
         return self.get_value('region', default='us-east-1')
@@ -106,6 +172,8 @@ class AWSHeet:
     def get_destroy(self):
         return self.args.destroy
 
+
+
     def get_value(self, name, kwargs={}, default='__unspecified__', required=False):
         """return first existing value from 1) kwargs dict params 2) global heet defaults 3) default param or 4) return None"""
         if (name in kwargs):
@@ -118,6 +186,8 @@ class AWSHeet:
             raise Exception("You are missing a required argument or default value for '%s'." % (name))
         return None
 
+
+
     def exec_awscli(self, cmd):
         env = os.environ.copy()
         env['AWS_ACCESS_KEY_ID'] = self.access_key_id
@@ -125,7 +195,10 @@ class AWSHeet:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, env=env)
         return proc.communicate()[0]
 
+
+
     def add_instance_to_elb(self, defaults, elb_name, instance_helper):
+        #-TODO: move this to Load Balancer Helper type when ELBHelper is implemented
         if self.args.destroy:
             return
         conn = boto.ec2.elb.connect_to_region(
