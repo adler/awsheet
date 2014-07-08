@@ -287,5 +287,5 @@ class InstanceHelper(AWSHelper):
     def supports_pv(self):
         """Return True when self.instance_type can boot from paravirtual EBS image (not HVM)
         http://aws.amazon.com/amazon-linux-ami/instance-type-matrix/"""
-        return not re.search('^(i2|cc2|g2|cg1|r3)\.', self.instance_type)
+        return not re.search('^(i2|cc2|g2|cg1|r3|t2)\.', self.instance_type)
 
