@@ -11,7 +11,7 @@ class NickNameHelper(AWSHelper):
         self.value = value
         self.zone_id = self.heet.get_value('zone_id', required=True)
         self.domain = self.heet.get_value('domain', required=True)
-        self.ttl = self.heet.get_value('ttl', kwargs, default=300)
+        self.ttl = self.heet.get_value('ttl', kwargs, default=60)
         self.conn = boto.connect_route53(
             aws_access_key_id=heet.access_key_id,
             aws_secret_access_key=heet.secret_access_key)
