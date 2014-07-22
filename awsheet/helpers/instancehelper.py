@@ -176,6 +176,8 @@ class InstanceHelper(AWSHelper):
             NickNameHelper(self.heet, self.get_dnsname(), self)
         if self.get_index_dnsname():
             NickNameHelper(self.heet, self.get_index_dnsname(), self)
+        # set the security groups in case they have changes since the instance was first created
+        self.conn.modify_instance_attribute(self.get_instance().id, 'groupSet', self.security_groups)
         self.post_converge_hook()
         name = self.get_dnsname()
         if not name:
